@@ -1,0 +1,54 @@
+import os
+import argparse
+import geopandas as gpd
+import whitebox
+whitebox.download_wbt(linux_musl=True, reset=True)
+
+# creating a tile index for each subdirectory in the specified root_dir.
+# iterates over the subdirectories, identifies the LAS/LAZ files within each subdirectory, sets the working directory to the subdirectory,
+# calls the lidar_tile_footprint function to generate a tile index. The tile index is saved as a temporary shapefile in the out_dir, with each subdirectory's name appended to the filename.
+
+def create_tile_index(root_dir, out_dir):
+    wbt = whitebox.WhiteboxTools()
+
+    # Get the list of subdirectories in the root directory
+    subdirs = next(os.walk(root_dir))[1]
+
+    # Iterate over subdirectories and process laz files
+    for subdir in subdirs:
+        subdir_path = os.path.join(root_dir, subdir)
+        laz_files = [file for file in os.listdir(subdir_path) if file.lower().endswith(('.las', '.laz'))]
+
+        # Skip subdirectories without laz files
+        if len(laz_files) == 0:
+            continue
+
+        # Set the working directory to the subdirectory
+        wbt.set_working_dir(subdir_path)
+
+        # Create a temporary output file for the current subdirectory
+        temp_output_file = os.path.join(out_dir, f"{subdir}_tile_index_temp.shp")
+
+        # Specify the input and output parameters
+        wbt.lidar_tile_footprint(temp_output_file)
+        
+# main entry point of the program. checks if the output directory exists, and if not, creates it. calls the create_tile_index function, passing the input and output directories as arguments, to generate the tile indexes for each subdirectory in the input directory.
+def main():
+    wbt = whitebox.WhiteboxTools()
+    wbt.set_verbose_mode(True)
+
+    input_directory = '/workspace/Lidardata01/National_datasets/LiDAR/laserdata_skog'
+    output_directory = '/workspace/Lidardata01/Lin/Data/LidarTile'
+
+    if not os.path.isdir(output_directory):
+        os.makedirs(output_directory)
+
+    create_tile_index(input_directory, output_directory)
+
+# ensures that the main function is only executed if the script is run directly as the main module, and not if it is imported as a module into another script.
+if __name__ == "__main__":
+    main()
+
+############merge shapefiles to one with ogr##################
+%%bash
+ogrmerge.py -single -o /workspace/Lidardata01/Lin/Data/LidarTile/merged.shp /workspace/Lidardata01/Lin/Data/LidarTile/*.shp
